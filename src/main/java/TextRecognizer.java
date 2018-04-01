@@ -2,7 +2,9 @@ import java.io.File;
 
 public interface TextRecognizer {
 
-    String getTextFromImageFile(File f, Language language);
+    Language getLanguage();
+
+    String getTextFromImageFile(File f);
 
     /**
      * Change our enum language to the String language we desire.

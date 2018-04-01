@@ -6,11 +6,17 @@ import java.io.*;
  * This does not accept colored images, only grayscale.
  */
 public class TextRecognizerTesseract implements TextRecognizer {
-
+    private final Language language;
     private ITesseract tess;
 
-    public TextRecognizerTesseract() {
+    public TextRecognizerTesseract(Language language) {
         tess = new Tesseract();
+        this.language = language;
+    }
+
+    @Override
+    public Language getLanguage() {
+        return language;
     }
 
     /**
@@ -20,6 +26,7 @@ public class TextRecognizerTesseract implements TextRecognizer {
      * @return String version for Tesseract implementation
      */
     public String implSpecificLanguage(Language language) {
+
         switch (language) {
             case JPN:
                 return "jpn";
@@ -32,7 +39,7 @@ public class TextRecognizerTesseract implements TextRecognizer {
         }
     }
 
-    public String getTextFromImageFile(File f, Language language) {
+    public String getTextFromImageFile(File f) {
         tess = new Tesseract();
         tess.setLanguage( implSpecificLanguage(language) );
 
@@ -48,8 +55,8 @@ public class TextRecognizerTesseract implements TextRecognizer {
 
     public static void main(String[] args) throws Exception {
         File imageFile = new File("random_manga_images/easy/watari_4.jpeg");
-        TextRecognizer tess = new TextRecognizerTesseract();
-        String text = tess.getTextFromImageFile(imageFile, Language.JPN);
+        TextRecognizer tess = new TextRecognizerTesseract(Language.JPN);
+        String text = tess.getTextFromImageFile(imageFile);
         System.out.println(text);
     }
 }
