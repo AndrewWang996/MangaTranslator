@@ -1,6 +1,5 @@
 import java.io.*;
 import java.util.*;
-import java.util.function.Function;
 
 import com.google.cloud.vision.v1.*;    // not sure if importing all is a great idea
 import com.google.protobuf.ByteString;
@@ -64,9 +63,6 @@ public class TextRecognizerGoogle implements TextRecognizer {
 
     /**
      * Find the minimum 4-sided axis aligned bounding box for any polygon
-     *
-     *
-     *
      *
      * @param poly bounding polygon, any number of sides
      * @return axis aligned bounding rectangle, 4 sides
