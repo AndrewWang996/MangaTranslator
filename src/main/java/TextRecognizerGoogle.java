@@ -1,7 +1,9 @@
 import java.io.*;
 import java.util.*;
+import java.util.List;
 
 import com.google.cloud.vision.v1.*;    // not sure if importing all is a great idea
+import com.google.cloud.vision.v1.Image;
 import com.google.protobuf.ByteString;
 
 /**
@@ -10,6 +12,7 @@ import com.google.protobuf.ByteString;
 public class TextRecognizerGoogle implements TextRecognizer {
     private static final int INF = (1 << 30);
     private final Language language;
+    private static final int MARGIN = 10;
 
     public TextRecognizerGoogle(Language language) {
         this.language = language;
@@ -60,6 +63,7 @@ public class TextRecognizerGoogle implements TextRecognizer {
 
         return joinAllParagraphs( paragraphs );
     }
+
 
     /**
      * Find the minimum 4-sided axis aligned bounding box for any polygon
@@ -186,7 +190,7 @@ public class TextRecognizerGoogle implements TextRecognizer {
     }
 
     private Optional<BoundingPoly> joinBoundingBoxes(BoundingPoly p1, BoundingPoly p2) {
-        if ( ! boxesIntersect(p1, p2) ) {
+        if ( ! boxesIntersect(p1, p2, MARGIN) ) {
             return Optional.empty();
         }
 
@@ -215,7 +219,7 @@ public class TextRecognizerGoogle implements TextRecognizer {
      * @param p2 second one
      * @return whether they intersect
      */
-    private boolean boxesIntersect(BoundingPoly p1, BoundingPoly p2) {
+    private boolean boxesIntersect(BoundingPoly p1, BoundingPoly p2, int margin) {
         int xmin, xmax, ymin, ymax;
         xmin = ymin = INF;
         xmax = ymax = - INF;
@@ -226,6 +230,11 @@ public class TextRecognizerGoogle implements TextRecognizer {
             if (v.getX() > xmax) xmax = v.getX();
             if (v.getY() > ymax) ymax = v.getY();
         }
+
+        xmin -= margin;
+        ymin -= margin;
+        xmax += margin;
+        ymax += margin;
 
         for(Vertex v2 : p2.getVerticesList()) {
             if ( v2.getX() >= xmin && v2.getX() <= xmax
@@ -244,7 +253,7 @@ public class TextRecognizerGoogle implements TextRecognizer {
     }
 
     public String getTextFromImageFile(File f) {
-        return "";
+        return "TextRecognizerGoogle.getTextFromImageFile() TO BE IMPLEMENTED";
     }
 
     /**
@@ -268,7 +277,7 @@ public class TextRecognizerGoogle implements TextRecognizer {
     }
 
     public static void main(String[] args) {
-        File imageFile = new File("random_manga_images/easy/watari_4.jpeg");
+        File imageFile = new File("random_manga_images/medium/watari_4.jpeg");
         TextRecognizer tess = new TextRecognizerGoogle(Language.JPN);
         String text = tess.getTextFromImageFile(imageFile);
         System.out.println(text);
