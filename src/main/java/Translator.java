@@ -3,6 +3,10 @@ import com.google.cloud.translate.Translate;
 import com.google.cloud.translate.Translate.TranslateOption;
 import com.google.cloud.translate.TranslateOptions;
 import com.google.cloud.translate.Translation;
+import com.google.common.html.HtmlEscapers;
+import org.jsoup.parser.Parser;
+
+import javax.swing.text.html.HTML;
 
 public class Translator {
     Translate translationEngine;
@@ -13,7 +17,8 @@ public class Translator {
                 TranslateOption.sourceLanguage(sourceLanguage),
                 TranslateOption.targetLanguage(targetLanguage)
         );
-        return translation.getTranslatedText();
+        String escapedText = translation.getTranslatedText();
+        return Parser.unescapeEntities(escapedText, false);
     }
 
     public String translateJapaneseToEnglish(String japaneseText) {
