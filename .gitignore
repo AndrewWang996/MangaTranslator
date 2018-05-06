@@ -1,4 +1,5 @@
 .idea/*
 *.log
-mangatranslator.iml
+*.iml
 target/*
+Manga_Translate*
