@@ -1,19 +1,28 @@
-import com.google.cloud.vision.v1.BoundingPoly;
-import com.google.cloud.vision.v1.Paragraph;
-import com.google.cloud.vision.v1.Vertex;
+import com.google.cloud.vision.v1.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
-import java.awt.color.ColorSpace;
+import java.awt.*;
+import java.awt.geom.Ellipse2D;
 import java.util.*;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public class ImageWriter {
+
+    private final BufferedImage img;
+    private final SpeechBubbleDetector bubbleDetector;
+    private final Translator translator;
+
+    public ImageWriter(String filepath) {
+        this.img = loadImage(filepath);
+        this.bubbleDetector = new SpeechBubbleDetector(this.img);
+        this.translator = new Translator();
+    }
+
+
 
     private static BufferedImage loadImage(String filepath) {
         BufferedImage img = null;
@@ -25,64 +34,81 @@ public class ImageWriter {
         return img;
     }
 
-    private static BufferedImage overlayRect(
-            BufferedImage img,
-            Color rectColor,
-            int x, int y,
-            int w, int h
-    ) {
-        Graphics g = img.getGraphics();
-        g.setColor(rectColor);
-        g.fillRect(x, y, w, h);
-        return img;
+    private void overlayRect(Rectangle rect) {
+        Graphics g = this.img.getGraphics();
+        g.setColor(this.bubbleDetector.calculateSurroundingColor(rect));
+
+        g.fillRect(
+                rect.UL.x,
+                rect.UL.y,
+                rect.width(),
+                rect.height()
+        );
     }
 
-    private static BufferedImage overlayText(
-            BufferedImage img,
-            String text,
-            int textSize,
-            int x, int y
-            ) {
-        Graphics g = img.getGraphics();
+    private void overlayText(String text, Rectangle rect) {
+        // TODO: Implement new method to determine text size
+        // TODO: Implement multiline solution
+        int textSize = rect.height() / 5;
+        int x = rect.UL.x;
+        int y = rect.UL.y;
+
+        Graphics g = this.img.getGraphics();
+        g.setColor(Color.BLACK);
         g.setFont( new Font("Arial Black", Font.BOLD, textSize) );
         g.drawString(text, x, y);
-        return img;
     }
 
-    /**
-     *
-     * @param img
-     * @return
-     */
-    public static BufferedImage writeParagraphs(
-            BufferedImage img,
+    public void writeParagraphs(List<Paragraph> paragraphs) {
+        for (Paragraph p : paragraphs) {
+            BoundingPoly box = p.getBoundingBox();
+            Rectangle rect = toRectangle(box);
+            overlayRect(rect);
+            String text = paragraphText(p, " ");
+            System.out.printf("writeParagraphs:%s\n", text);
+            overlayText(text, rect);
+        }
+    }
+
+    private String paragraphText(Paragraph p, String wordDelimiter) {
+        StringBuilder strBuilder = new StringBuilder();
+        for (Word word : p.getWordsList()) {
+            strBuilder.append(wordText(word));
+            strBuilder.append(wordDelimiter);
+        }
+        return strBuilder.toString();
+    }
+
+    private String wordText(Word w) {
+        StringBuilder strBuilder = new StringBuilder();
+        for (Symbol s : w.getSymbolsList()) {
+            strBuilder.append(s.getText());
+        }
+        return strBuilder.toString();
+    }
+
+
+    public void drawSpeechBubbles(
             List<Paragraph> paragraphs
     ) {
         for (Paragraph p : paragraphs) {
             BoundingPoly box = p.getBoundingBox();
-            Vertex topLeft = getTopLeft(box);
-            int x = topLeft.getX();
-            int y = topLeft.getY();
-            Vertex botRight = getBottomRight(box);
-            int w = Math.abs(x - botRight.getX());
-            int h = Math.abs(y - botRight.getY());
+            Rectangle rect = toRectangle(box);
 
+            Ellipse2D ellipse = new Ellipse2D.Float(
+                    rect.UL.x,
+                    rect.UL.y,
+                    (float)rect.width(),
+                    (float)rect.height()
+            );
 
-
-            Color gray = Color.LIGHT_GRAY;
-            ColorSpace space = gray.getColorSpace();
-            float[] components = new float[3];
-            gray.getColorComponents(space, components);
-            Color rectColor = new Color(space, components, 0.5f);
-            overlayRect(img, rectColor, x, y, w, h);
-            // TODO: Replace color with method that determines color of background
-
-            // TODO: Write text
+            Graphics2D g = (Graphics2D)img.getGraphics();
+            g.setColor(Color.BLACK);
+            g.draw(ellipse);
         }
-        return img;
     }
 
-    private static void displayImage(BufferedImage img) {
+    private void displayImage() {
         JFrame window = new JFrame();
         window.setSize(1000, 1000);
         window.setTitle("Manga Translator");
@@ -94,9 +120,7 @@ public class ImageWriter {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                System.out.println("painting the image");
                 g.drawImage(img, 0, 0, null);
-                System.out.println("painted the image");
             }
         };
 
@@ -105,30 +129,69 @@ public class ImageWriter {
         window.setVisible(true);
     }
 
-    private static Vertex getTopLeft(BoundingPoly box) {
-        int x,y;
-        x = y = (1 << 30);
+    private static Rectangle toRectangle(BoundingPoly box) {
+        int xmax, ymax, xmin,ymin;
+        xmax = ymax = - (1 << 30);
+        xmin = ymin = (1 << 30);
         for (Vertex v : box.getVerticesList()) {
-            if (v.getX() < x) { x = v.getX(); }
-            if (v.getY() < y) { y = v.getY(); }
+            if (v.getX() > xmax) { xmax = v.getX(); }
+            if (v.getY() > ymax) { ymax = v.getY(); }
+            if (v.getX() < xmin) { xmin = v.getX(); }
+            if (v.getY() < ymin) { ymin = v.getY(); }
         }
-        return Vertex.newBuilder().setX(x).setY(y).build();
+        return new Rectangle(xmin, ymin, xmax, ymax);
     }
 
-    private static Vertex getBottomRight(BoundingPoly box) {
-        int x,y;
-        x = y = - (1 << 30);
-        for (Vertex v : box.getVerticesList()) {
-            if (v.getX() > x) { x = v.getX(); }
-            if (v.getY() > y) { y = v.getY(); }
+    /**
+     * Sometimes Google's OCR fails to correctly box the japanese text.
+     * This method is to account for this.
+     *
+     * @param paragraphs list of paragraphs
+     */
+    private void resizeParagraphs(List<Paragraph> paragraphs) {
+        for (int i=0; i<paragraphs.size(); i++) {
+            Paragraph p = paragraphs.get(i);
+            Rectangle rect = toRectangle(p.getBoundingBox());
+            rect = new SpeechBubbleDetector(this.img).fixParagraph(rect);
+            paragraphs.set(i, p.toBuilder()
+                    .setBoundingBox(rect.toBoundingPoly())
+                    .build()
+                );
         }
-        return Vertex.newBuilder().setX(x).setY(y).build();
+    }
+
+    private List<Paragraph> translatedParagraphs(List<Paragraph> paragraphs) {
+        List<Paragraph> newParagraphs = new ArrayList<>();
+        for (int i=0; i<paragraphs.size(); i++) {
+            Paragraph p = paragraphs.get(i);
+            String jText = paragraphText(p, "");
+            String eText = this.translator.translateJapaneseToEnglish(jText);
+
+            newParagraphs.add( p.toBuilder()
+                    .clearWords()
+                    .addAllWords(toWords(eText))
+                    .build()
+            );
+        }
+        return newParagraphs;
+    }
+
+    private List<Word> toWords(String text) {
+        List<Word> words = new ArrayList<>();
+        for (String w : text.split("\\s+")) {
+            Word.Builder wordBuilder = Word.newBuilder();
+            for (char c : w.toCharArray()) {
+                Symbol symbol = Symbol.newBuilder().setText("" + c).build();
+                wordBuilder.addSymbols(symbol);
+            }
+            words.add(wordBuilder.build());
+        }
+        return words;
     }
 
     public static void main(String[] args) {
+        String filepath = "random_manga_images/easy/hanebado.jpeg";
 
-        String filepath = "/Users/andywang/IdeaProjects/mangatranslator" +
-                "/random_manga_images/easy/hanebado.jpeg";
         BufferedImage img = loadImage(filepath);
         TextRecognizerGoogle txtRec = new TextRecognizerGoogle(Language.JPN);
         java.util.List<Paragraph> paragraphs = new ArrayList<>();
@@ -140,13 +203,10 @@ public class ImageWriter {
             System.exit(0);
         }
 
-        Paragraph one = paragraphs.get(0);
-        System.out.println(one.getBoundingBox());
-        System.out.println(getTopLeft(one.getBoundingBox()));
-        System.out.println(getBottomRight(one.getBoundingBox()));
-        System.out.printf("Paragraphs length: %d\n", paragraphs.size());
-
-        writeParagraphs(img, paragraphs);
-        displayImage(img);
+        ImageWriter iw = new ImageWriter(filepath);
+        iw.resizeParagraphs(paragraphs);
+        iw.drawSpeechBubbles(paragraphs);
+        iw.writeParagraphs( iw.translatedParagraphs(paragraphs) );
+        iw.displayImage();
     }
 }
