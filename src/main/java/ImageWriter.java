@@ -3,7 +3,12 @@ import com.google.cloud.vision.v1.*;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.font.TextAttribute;
 import java.awt.geom.Ellipse2D;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.text.AttributedCharacterIterator;
+import java.text.AttributedString;
 import java.util.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -24,7 +29,7 @@ public class ImageWriter {
 
 
 
-    private static BufferedImage loadImage(String filepath) {
+    protected static BufferedImage loadImage(String filepath) {
         BufferedImage img = null;
         try {
             img = ImageIO.read(new File(filepath));
@@ -36,7 +41,17 @@ public class ImageWriter {
 
     private void overlayRect(Rectangle rect) {
         Graphics g = this.img.getGraphics();
-        g.setColor(this.bubbleDetector.calculateSurroundingColor(rect));
+
+        g.setColor(
+                this.bubbleDetector.calculateEdgeColor(
+                        new Rectangle(
+                                rect.UL.x - 1,
+                                rect.UL.y - 1,
+                                rect.BR.x + 1,
+                                rect.BR.y + 1
+                        )
+                )
+        );
 
         g.fillRect(
                 rect.UL.x,
@@ -47,25 +62,51 @@ public class ImageWriter {
     }
 
     private void overlayText(String text, Rectangle rect) {
-        // TODO: Implement new method to determine text size
-        // TODO: Implement multiline solution
-        int textSize = rect.height() / 5;
-        int x = rect.UL.x;
-        int y = rect.UL.y;
-
         Graphics g = this.img.getGraphics();
         g.setColor(Color.BLACK);
-        g.setFont( new Font("Arial Black", Font.BOLD, textSize) );
-        g.drawString(text, x, y);
+        text = text.trim().replaceAll(" +", " ");
+
+        int fontSize = 20;
+        Font font = new Font("Stencil", Font.PLAIN, fontSize);
+        try {
+            URL fontURL = new URL(new URL("file:"), "Fonts/animeace.ttf");
+            font = Font.createFont(Font.TRUETYPE_FONT, fontURL.openStream());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (FontFormatException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        g.setFont(font);
+        TextProcessor txtProcessor = new TextProcessor((Graphics2D)g);
+        txtProcessor.resizeToFit(text, rect);
+        g.setFont(txtProcessor.getFont());
+        String[] lines = txtProcessor.splitIntoLines(text, rect.width());
+        this.drawStrings((Graphics2D)g, lines, rect);
+    }
+
+
+    private void drawStrings(Graphics2D g2, String[] lines, Rectangle box) {
+        TextProcessor txtProcessor = new TextProcessor(g2);
+        int textHeight = txtProcessor.textHeight(lines);
+        int x, y = box.ymin() + (box.height() - textHeight) / 2;
+        for (String line : lines) {
+            line = line.trim();
+            y += txtProcessor.lineHeight();
+            int lineWidth = txtProcessor.lineWidth(line);
+            x = (box.xmin() + box.xmax()) / 2 - lineWidth / 2;
+            g2.drawString(line, x, y);
+        }
     }
 
     public void writeParagraphs(List<Paragraph> paragraphs) {
         for (Paragraph p : paragraphs) {
             BoundingPoly box = p.getBoundingBox();
             Rectangle rect = toRectangle(box);
+            rect = this.bubbleDetector.getLargestExpansion(rect);
             overlayRect(rect);
             String text = paragraphText(p, " ");
-            System.out.printf("writeParagraphs:%s\n", text);
             overlayText(text, rect);
         }
     }
@@ -190,11 +231,12 @@ public class ImageWriter {
     }
 
     public static void main(String[] args) {
-        String filepath = "random_manga_images/easy/hanebado.jpeg";
+        String filepath = "random_manga_images/dagashi.jpeg";
 
-        BufferedImage img = loadImage(filepath);
         TextRecognizerGoogle txtRec = new TextRecognizerGoogle(Language.JPN);
         java.util.List<Paragraph> paragraphs = new ArrayList<>();
+
+
 
         try {
             paragraphs = txtRec.detectDocumentText(filepath);
@@ -205,7 +247,7 @@ public class ImageWriter {
 
         ImageWriter iw = new ImageWriter(filepath);
         iw.resizeParagraphs(paragraphs);
-        iw.drawSpeechBubbles(paragraphs);
+//        iw.drawSpeechBubbles(paragraphs);
         iw.writeParagraphs( iw.translatedParagraphs(paragraphs) );
         iw.displayImage();
     }

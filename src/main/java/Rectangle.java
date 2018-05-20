@@ -5,8 +5,14 @@ import com.google.cloud.vision.v1.Vertex;
 import java.util.ArrayList;
 import java.util.List;
 
+
 public class Rectangle {
     public vertex UL, BR;
+
+    /**
+     * Constructor that uses coordinates of top left and bottom right vertices of rectangle.
+     * The rectangle includes both vertices.
+     */
     public Rectangle(int xmin, int ymin, int xmax, int ymax) {
         UL = new vertex(xmin, ymin);
         BR = new vertex(xmax, ymax);
@@ -24,6 +30,24 @@ public class Rectangle {
     public int width() {
         return BR.x - UL.x;
     }
+
+    public int xmin() {
+        return this.UL.x;
+    }
+
+    public int ymin() {
+        return this.UL.y;
+    }
+
+    public int xmax() {
+        return this.BR.x;
+    }
+
+    public int ymax() {
+        return this.BR.y;
+    }
+
+    public int area() { return this.width() * this.height(); }
 
     public Rectangle copy() {
         return new Rectangle(UL.copy(), BR.copy());
