@@ -3,12 +3,9 @@ import com.google.cloud.vision.v1.*;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.font.TextAttribute;
 import java.awt.geom.Ellipse2D;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.text.AttributedCharacterIterator;
-import java.text.AttributedString;
 import java.util.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -43,7 +40,7 @@ public class ImageWriter {
         Graphics g = this.img.getGraphics();
 
         g.setColor(
-                this.bubbleDetector.calculateEdgeColor(
+                this.bubbleDetector.calculateSpeechBubbleColor(
                         new Rectangle(
                                 rect.UL.x - 1,
                                 rect.UL.y - 1,

@@ -4,7 +4,7 @@ import java.awt.image.BufferedImage;
 
 public class SpeechBubbleDetector {
     private final BufferedImage img;
-    private static final float COLOR_DIFF_MAX = 0.01f;
+    private static final float COLOR_STDEV_LIM = 25.0f;
     private static final float BUBBLE_COLOR_ALLOWED_ERROR = 0.3f; // a percentage
     private static final Color TRANSLUCENT = new Color(
             Color.LIGHT_GRAY.getRed(),
@@ -37,7 +37,7 @@ public class SpeechBubbleDetector {
     public Rectangle getLargestExpansion(Rectangle box) {
         int xmin, ymin, xmax, ymax;
         int x = 0;
-        Color bubbleBackgroundColor = this.calculateEdgeColor(box);
+        Color bubbleBackgroundColor = this.calculateSpeechBubbleColor(box);
         Rectangle containingBox;
         Rectangle bestBox = box;
         do {
@@ -102,7 +102,7 @@ public class SpeechBubbleDetector {
         return this.colorDiff(c, bubbleBackground) < BUBBLE_COLOR_ALLOWED_ERROR;
     }
 
-    public Color calculateEdgeColor(Rectangle box) {
+    public Color calculateSpeechBubbleColor(Rectangle box) {
         box = this.clampRect(box);
         int xmin = box.UL.x;
         int ymin = box.UL.y;
@@ -114,9 +114,13 @@ public class SpeechBubbleDetector {
         Color left = calculateAverageColor(new Rectangle(xmin, ymin, xmin, ymax));
         Color right = calculateAverageColor(new Rectangle(xmax, ymin, xmax, ymax));
 
-        int R = (top.getRed() + bot.getRed() + left.getRed() + right.getRed()) / 4;
-        int G = (top.getGreen() + bot.getGreen() + left.getGreen() + right.getGreen()) / 4;
-        int B = (top.getBlue() + bot.getBlue() + left.getBlue() + right.getGreen()) / 4;
+
+        int R = 0, G = 0, B = 0;
+        for (Color c : new Color[]{top, bot, left, right}) {
+            if (c.getRed() > R) R = c.getRed();
+            if (c.getGreen() > G) G = c.getGreen();
+            if (c.getBlue() > B) B = c.getBlue();
+        }
 
         return new Color(R, G, B);
     }
@@ -126,8 +130,8 @@ public class SpeechBubbleDetector {
         int G=0;
         int B=0;
         int n=0;
-        for (int x = box.UL.x; x <= box.BR.x; x++) {
-            for (int y = box.UL.y; y <= box.BR.y; y++) {
+        for (int x = box.xmin(); x <= box.xmax(); x++) {
+            for (int y = box.ymin(); y <= box.ymax(); y++) {
                 Color pixel = new Color(img.getRGB(x,y));
                 R += pixel.getRed();
                 G += pixel.getGreen();
@@ -136,6 +140,23 @@ public class SpeechBubbleDetector {
             }
         }
         return new Color(R/n, G/n, B/n);
+    }
+
+    private float calculateColorStdev(Rectangle box) {
+        Color avgColor = this.calculateAverageColor(box);
+        float sum = 0;
+        float n = 0;
+        for (int x = box.xmin(); x <= box.xmax(); x++) {
+            for (int y = box.ymin(); y <= box.ymax(); y++) {
+                Color pixel = new Color(img.getRGB(x,y));
+                sum += Math.pow(pixel.getRed() - avgColor.getRed(), 2);
+                sum += Math.pow(pixel.getGreen() - avgColor.getGreen(), 2);
+                sum += Math.pow(pixel.getBlue() - avgColor.getBlue(), 2);
+                n += 3;
+            }
+        }
+        float variance = sum / n;
+        return (float)Math.sqrt(variance);
     }
 
     private Color calculateAverageColor(Ellipse2D bubble) {
@@ -160,18 +181,24 @@ public class SpeechBubbleDetector {
     }
 
     public Rectangle fixParagraph(Rectangle box) {
-        Color c = this.calculateAverageColor(box);
         Rectangle newBox = box.copy();
 
         // expand vertically upward
         while (newBox.UL.y > 0) {
-            newBox.UL.y --;
-            Color nC = this.calculateAverageColor(newBox);
-            if (colorDiff(c, nC) > COLOR_DIFF_MAX) {
+            float stdev = calculateColorStdev(
+                    new Rectangle(
+                            newBox.xmin(),
+                            newBox.ymin(),
+                            newBox.xmax(),
+                            newBox.ymin()
+                    )
+            );
+            if (stdev < COLOR_STDEV_LIM) {
                 break;
             }
+            newBox.UL.y --;
         }
-
+        newBox.UL.y ++;
         return newBox;
     }
 
@@ -184,10 +211,10 @@ public class SpeechBubbleDetector {
     }
 
     private Rectangle clampRect(Rectangle box) {
-        int xmin = Math.max(0, box.UL.x);
-        int xmax = Math.min(img.getWidth() - 1, box.BR.x);
-        int ymin = Math.max(0, box.UL.y);
-        int ymax = Math.min(img.getHeight() - 1, box.BR.y);
+        int xmin = Math.max(0, box.xmin());
+        int xmax = Math.min(img.getWidth() - 1, box.xmax());
+        int ymin = Math.max(0, box.ymin());
+        int ymax = Math.min(img.getHeight() - 1, box.ymax());
         return new Rectangle(xmin, ymin, xmax, ymax);
     }
 
