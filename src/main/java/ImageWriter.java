@@ -228,7 +228,7 @@ public class ImageWriter {
     }
 
     public static void main(String[] args) {
-        String filepath = "random_manga_images/dagashi.jpeg";
+        String filepath = "random_manga_images/easy/dagashi.jpeg";
 
         TextRecognizerGoogle txtRec = new TextRecognizerGoogle(Language.JPN);
         java.util.List<Paragraph> paragraphs = new ArrayList<>();
